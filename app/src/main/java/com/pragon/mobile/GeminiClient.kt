@@ -97,7 +97,7 @@ object GeminiClient {
     ): ChatResult {
         val key = Prefs.effectiveAiKey(ctx)
         if (key.isBlank()) {
-            return ChatResult("I need a Pragon AI key first. Add yours in Settings, or pair with your PC once and I'll use its key.", emptyList(), true)
+            return ChatResult("I need a Pragon AI key first. Add yours in Settings, or pair with your PC once and I'll use its key. To work with no key: Settings > Offline, turn on Always-offline lock and download the chat model.", emptyList(), true)
         }
         val history = Conversation.gemini
         Conversation.trim()

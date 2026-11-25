@@ -118,6 +118,9 @@ object Brain {
         // ---- strict offline: nothing matched, so this is conversation. Only the on-device chat model may answer. ----
         if (Prefs.engine(ctx) == "local") return localChat(ctx, raw, files, mode, sink)
 
+        // v8.3: online, but no AI key saved and a chat model is installed on the phone: answer on the phone instead of asking for a key.
+        if (Prefs.engine(ctx) == "gemini" && Prefs.effectiveAiKey(ctx).isBlank() && Offline.chatFile(ctx) != null) return localChat(ctx, raw, files, mode, sink)
+
         // ---- the AI ----
         Guard.engineProblem(ctx)?.let { return Reply(it, true, false) }
         Conversation.checkEngine(ctx)

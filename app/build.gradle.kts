@@ -11,8 +11,8 @@ android {
         applicationId = "com.pragon.mobile"
         minSdk = 31
         targetSdk = 34
-        versionCode = 82
-        versionName = "8.2"
+        versionCode = 83
+        versionName = "8.3"
         ndk { abiFilters += "arm64-v8a" }   // v12: phones only (one native set = smallest APK)
     }
     // v8.1: no locale filter, so every language's strings are kept again.

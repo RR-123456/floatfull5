@@ -39,6 +39,8 @@ object PiperTts {
     @Volatile var state = "idle"                   // "idle", "loading", "ready" or "error: ..."
     @Volatile var downloading = false
     @Volatile var dlState = ""                     // "", "37%", "unpacking", "done" or "error: ..."
+    @Volatile var lastTrace = ""                   // v8.2: where the last load failed
+    @Volatile var lastError = ""                   // v8.2: why the last sentence could not be spoken
 
     @Volatile private var tts: OfflineTts? = null
     private val loadLock = Any()
@@ -46,7 +48,13 @@ object PiperTts {
     // ── where things live ────────────────────────────────────────────────
 
     private fun dir(c: Context) = File(c.filesDir, "kokoro")
-    private fun modelFile(c: Context) = File(dir(c), "model.int8.onnx")
+    /** The int8 pack calls it model.int8.onnx; accept model.onnx too. */
+    private fun modelFile(c: Context): File {
+        val i8 = File(dir(c), "model.int8.onnx")
+        if (i8.exists()) return i8
+        val f = File(dir(c), "model.onnx")
+        return if (f.exists()) f else i8
+    }
     private fun voicesFile(c: Context) = File(dir(c), "voices.bin")
     private fun tokensFile(c: Context) = File(dir(c), "tokens.txt")
     private fun dataDir(c: Context) = File(dir(c), "espeak-ng-data")
@@ -94,6 +102,7 @@ object PiperTts {
             t
         } catch (e: Throwable) {
             state = "error: ${e.message ?: e.javaClass.simpleName}"
+            lastTrace = VoiceDiag.trace(e)
             null
         }
     }
@@ -110,7 +119,7 @@ object PiperTts {
 
     // ── speaking: one worker thread, sentence by sentence ────────────────
 
-    private class Job(val text: String, val speed: Float, val gen: Int, val done: (Boolean) -> Unit)
+    private class Job(val text: String, val speed: Float, val gen: Int, val lang: String?, val done: (Boolean) -> Unit)
 
     private val queue = LinkedBlockingQueue<Job>()
     @Volatile private var gen = 0
@@ -122,13 +131,13 @@ object PiperTts {
      * Queues one sentence. [done] is called on the worker thread with true when it has been spoken, or false when Piper failed
      * before any sound came out (the caller then speaks it with the phone's own voice). Nothing is called after [stop].
      */
-    fun enqueue(text: String, speed: Float, done: (Boolean) -> Unit) {
+    fun enqueue(text: String, speed: Float, lang: String? = null, done: (Boolean) -> Unit) {
         synchronized(this) {
             if (worker == null) {
                 worker = Thread({ loop() }, "kokoro-tts").also { it.isDaemon = true; it.start() }
             }
         }
-        queue.put(Job(text, speed.coerceIn(0.6f, 1.6f), gen, done))
+        queue.put(Job(text, speed.coerceIn(0.6f, 1.6f), gen, lang, done))
     }
 
     /** Stops at once: drops everything queued and cuts the sentence being spoken. */
@@ -147,6 +156,7 @@ object PiperTts {
             try {
                 speakOne(j)
             } catch (e: Throwable) {
+                lastError = VoiceDiag.trace(e)
                 ok = played           // failed after some sound = treat as spoken; failed before any = let the phone voice do it
             }
             if (j.gen == gen) try { j.done(ok) } catch (e: Throwable) { }
@@ -154,7 +164,11 @@ object PiperTts {
     }
 
     private fun speakOne(j: Job) {
-        val t = tts ?: throw IllegalStateException("The offline voice is not loaded")
+        // v8.2: j.lang == null is the English Kokoro voice; "ta", "te", "hi" are the MMS voices (see MmsTts).
+        val t = (if (j.lang == null) tts else MmsTts.engine(j.lang)) ?: throw IllegalStateException("The offline voice is not loaded")
+        val sid = if (j.lang == null) SPEAKER else 0
+        val said = if (j.lang == null) prepare(j.text) else MmsTts.prepare(j.text)
+        if (said.isBlank()) return
         val rate = t.sampleRate()
         val minBuf = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT)
         val buf = maxOf(minBuf, rate / 2 * 4)             // about half a second of float audio
@@ -169,7 +183,7 @@ object PiperTts {
         var frames = 0L
         try {
             at.play()
-            t.generateWithCallback(text = prepare(j.text), sid = SPEAKER, speed = j.speed) { samples ->
+            t.generateWithCallback(text = said, sid = sid, speed = j.speed) { samples ->
                 if (j.gen != gen) {
                     0                                         // stop generating
                 } else {
@@ -246,7 +260,8 @@ object PiperTts {
                 dlState = "unpacking"
                 untar(archive, tmp)
                 archive.delete()
-                if (File(tmp, "model.int8.onnx").length() < MIN_MODEL_BYTES) throw IOException("the voice file is missing or too small")
+                val got = listOf("model.int8.onnx", "model.onnx").map { File(tmp, it) }.firstOrNull { it.exists() }
+                if (got == null || got.length() < MIN_MODEL_BYTES) throw IOException("the voice file is missing or too small")
                 if (File(tmp, "voices.bin").length() == 0L) throw IOException("the archive has no voices.bin")
                 if (File(tmp, "tokens.txt").length() == 0L) throw IOException("the archive has no tokens.txt")
                 if (!File(tmp, "espeak-ng-data/phontab").exists()) throw IOException("the archive has no espeak-ng-data")
@@ -266,7 +281,7 @@ object PiperTts {
         }.start()
     }
 
-    private fun fetch(http: OkHttpClient, link: String, dest: File, progress: (String) -> Unit) {
+    internal fun fetch(http: OkHttpClient, link: String, dest: File, progress: (String) -> Unit) {
         http.newCall(Request.Builder().url(link).build()).execute().use { r ->
             if (!r.isSuccessful) throw IOException("HTTP ${r.code}")
             val body = r.body ?: throw IOException("empty answer")
@@ -302,5 +317,41 @@ object PiperTts {
                 out.outputStream().use { tin.copyTo(it) }
             }
         }
+    }
+
+    // ── v8.2: test and report ────────────────────────────────────────────
+
+    /** Speaks [text] through the same worker the app uses and says what happened. [lang] null = Kokoro. */
+    internal fun playTest(text: String, lang: String?): String {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var result = false
+        lastError = ""
+        enqueue(text, 1.0f, lang) { ok -> result = ok; latch.countDown() }
+        return when {
+            !latch.await(30, TimeUnit.SECONDS) -> "TIMED OUT after 30 seconds (the voice is too slow or stuck)"
+            result && lastError.isEmpty() -> "played (you should have heard it)"
+            result -> "played, with a problem: $lastError"
+            else -> "FAILED: ${lastError.ifBlank { "no sound came out" }}"
+        }
+    }
+
+    fun diagnose(c: Context): String {
+        val sb = StringBuilder("REALISTIC VOICE (Kokoro, English)\n")
+        fun size(f: File) = if (f.exists()) "${f.length() / 1000} KB" else "MISSING"
+        sb.append("model: ${size(modelFile(c))} | voices.bin: ${size(voicesFile(c))} | tokens.txt: ${size(tokensFile(c))} | espeak data: ${if (File(dataDir(c), "phontab").exists()) "ok" else "MISSING"}\n")
+        sb.append("state: $state | loaded: ${loaded()} | switch on: ${Prefs.piperOn(c)} | download: ${dlState.ifBlank { "-" }}\n")
+        if (!hasModel(c)) { sb.append("-> not downloaded or incomplete. Settings > Offline > Realistic voice > Download.\n"); return sb.toString() }
+        val t = tts ?: try { load(c) } catch (e: Throwable) { null }
+        if (t == null) { sb.append("could not load: $state\n$lastTrace\n"); return sb.toString() }
+        try {
+            val t0 = System.currentTimeMillis()
+            val a = t.generate("Hello, this is a voice test.", SPEAKER, 1.0f)
+            var peak = 0f
+            for (s in a.samples) { val v = kotlin.math.abs(s); if (v > peak) peak = v }
+            sb.append("made ${a.samples.size} samples at ${a.sampleRate} Hz in ${System.currentTimeMillis() - t0} ms, loudest ${String.format(java.util.Locale.US, "%.2f", peak)}\n")
+            if (a.samples.isEmpty() || peak < 0.01f) sb.append("-> the voice made silence\n")
+        } catch (e: Throwable) { sb.append("making speech FAILED: ${VoiceDiag.trace(e)}\n") }
+        sb.append("playback: ${playTest("Hello, this is a voice test.", null)}\n")
+        return sb.toString()
     }
 }

@@ -39,6 +39,8 @@ class Speaker private constructor(private val app: Context) {
     private var currentTag = ""
     /** v7.8: true while the current reply is spoken by Piper (decided once per reply); false = the phone's own voice. */
     @Volatile private var viaPiper = false
+    /** v8.2: "ta", "te" or "hi" while the current reply is spoken by an offline MMS voice; null otherwise. */
+    @Volatile private var mmsCode: String? = null
     private var focus: AudioFocusRequest? = null
 
     /** Called on the main thread when everything queued has been spoken (or speech was stopped). */
@@ -144,13 +146,18 @@ class Speaker private constructor(private val app: Context) {
         if (!add) halt(silent = true)
         // v7.8: the voice is chosen once per reply. Piper when it is loaded; otherwise the phone's own text to speech.
         if (pending == 0) {
-            viaPiper = PiperTts.usable(app)
-            if (!viaPiper && Prefs.piperOn(app) && PiperTts.hasModel(app)) PiperTts.warmup(app)   // not loaded yet: load it for next time
+            // v8.2: Tamil / Telugu / Hindi text uses its offline MMS voice when that is loaded; everything else uses Kokoro, then the phone.
+            val mms = MmsTts.forTag(LangDetect.tagFor(clean))
+            mmsCode = if (mms != null && MmsTts.usable(app, mms)) mms.code else null
+            if (mms != null && mmsCode == null && Prefs.piperOn(app) && MmsTts.hasModel(app, mms)) MmsTts.warmup(app, mms)   // not loaded yet: load it for next time
+            viaPiper = mms == null && PiperTts.usable(app)
+            if (mms == null && !viaPiper && Prefs.piperOn(app) && PiperTts.hasModel(app)) PiperTts.warmup(app)   // not loaded yet: load it for next time
         }
+        val neural = viaPiper || mmsCode != null
         val t = tts
-        if (!viaPiper && (!ready || t == null)) { synchronized(backlog) { backlog.add(text0 to add) }; return }
+        if (!neural && (!ready || t == null)) { synchronized(backlog) { backlog.add(text0 to add) }; return }
         if (pending == 0) {
-            if (!viaPiper && t != null) {
+            if (!neural && t != null) {
                 // A new reply starts: pick the language from the script of its first sentence.
                 val tag = LangDetect.tagFor(clean) ?: ""
                 apply(tag)
@@ -171,9 +178,9 @@ class Speaker private constructor(private val app: Context) {
         for (p in parts.ifEmpty { listOf(clean) }) {
             pending++
             val id = "p$gen:${counter++}"
-            if (viaPiper) {
+            if (neural) {
                 val chunk = p.take(900)
-                PiperTts.enqueue(chunk, Prefs.ttsRate(app)) { ok ->
+                PiperTts.enqueue(chunk, Prefs.ttsRate(app), mmsCode) { ok ->
                     if (ok) finished(id) else main.post { speakWithPhone(chunk, id) }   // Piper failed: the phone's voice says it instead
                 }
             } else if (t != null) {
@@ -187,6 +194,7 @@ class Speaker private constructor(private val app: Context) {
     /** Piper could not say [text]: say it with Android's text to speech under the same id, so the count still works out. */
     private fun speakWithPhone(text: String, id: String) {
         val t = tts
+        try { if (t != null) apply(LangDetect.tagFor(text) ?: "") } catch (e: Exception) { }   // v8.2: Tamil / Telugu / Hindi text needs that language's phone voice
         if (t == null || !ready || t.speak(text, TextToSpeech.QUEUE_ADD, null, id) != TextToSpeech.SUCCESS) finished(id)
     }
 

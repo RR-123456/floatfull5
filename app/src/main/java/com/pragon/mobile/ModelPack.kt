@@ -42,7 +42,7 @@ object ModelPack {
         val host = try { java.net.URI(url).host?.lowercase() ?: "" } catch (e: Exception) { "" }
         if (!url.startsWith("https://") || host.isEmpty()) return "Paste a full https:// link to a .litertlm file."
         if (!url.substringBefore('?').lowercase().endsWith(".litertlm")) return "The link must end in .litertlm (only LiteRT-LM files work)."
-        if (running || Offline.downloading || SherpaStt.downloading || PiperTts.downloading) return "Another download is running. Wait for it to finish, then tap again."
+        if (running || Offline.downloading || SherpaStt.downloading || PiperTts.downloading || MmsTts.anyDownloading()) return "Another download is running. Wait for it to finish, then tap again."
         if (!Net.online(app)) return "Connect to Wi-Fi first."
         val typed = tokenIn.trim()
         if (typed.isNotEmpty()) Prefs.setHfToken(app, typed)
@@ -69,7 +69,7 @@ object ModelPack {
     private fun begin(app0: Context, parts: Set<String>, loadAfter: Boolean, tokenIn: String): String {
         val app = app0.applicationContext
         if (running) return "Already working: $state"
-        if (Offline.downloading || SherpaStt.downloading || PiperTts.downloading) return "Another download is running. Wait for it to finish, then tap again."
+        if (Offline.downloading || SherpaStt.downloading || PiperTts.downloading || MmsTts.anyDownloading()) return "Another download is running. Wait for it to finish, then tap again."
         val typed = tokenIn.trim()
         if (typed.isNotEmpty()) Prefs.setHfToken(app, typed)
         val missing = parts.filter { missing(app, it) }

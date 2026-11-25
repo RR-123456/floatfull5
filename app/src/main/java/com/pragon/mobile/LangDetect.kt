@@ -9,17 +9,18 @@ import java.util.Locale
  */
 object LangDetect {
 
-    /** v7.7: Pragon speaks English only. Set false to bring back script-based voice switching. */
-    private const val ENGLISH_ONLY = true
+    /** v8.1: all languages are back (v7.7 had locked Pragon to English). Set true to lock to English again. */
+    private const val ENGLISH_ONLY = false
 
     private class Range(val lo: Int, val hi: Int, val tag: String)
 
+    // v8.1 priority order: Tamil, Telugu, Hindi first (English is the Latin default), then the rest.
     private val RANGES = listOf(
         Range(0x0B80, 0x0BFF, "ta-IN"),   // Tamil
         Range(0x0C00, 0x0C7F, "te-IN"),   // Telugu
+        Range(0x0900, 0x097F, "hi-IN"),   // Devanagari (Hindi, Marathi)
         Range(0x0C80, 0x0CFF, "kn-IN"),   // Kannada
         Range(0x0D00, 0x0D7F, "ml-IN"),   // Malayalam
-        Range(0x0900, 0x097F, "hi-IN"),   // Devanagari (Hindi, Marathi)
         Range(0x0980, 0x09FF, "bn-IN"),   // Bengali
         Range(0x0A00, 0x0A7F, "pa-IN"),   // Gurmukhi (Punjabi)
         Range(0x0A80, 0x0AFF, "gu-IN"),   // Gujarati
@@ -34,7 +35,7 @@ object LangDetect {
 
     /** Locale tag such as "ta-IN" when the text is mostly in a non-Latin script, else null. */
     fun tagFor(text: String): String? {
-        if (ENGLISH_ONLY) return null          // v7.7: English only, so the voice never switches language by script
+        if (ENGLISH_ONLY) return null          // English lock (off): when true the voice never switches language by script
         if (text.isBlank()) return null
         val counts = IntArray(RANGES.size)
         var letters = 0

@@ -152,7 +152,9 @@ class PragonAccessibilityService : AccessibilityService() {
     fun dictate(piece0: String): Boolean {
         var added = ""
         // v7.7: auto punctuation. Full stops and question marks only in multi-line boxes (messages, notes), never in a one-line search bar.
-        val piece = if (Prefs.typerPunct(this)) {
+        // v8.1: the punctuation rules are English; other languages are typed exactly as heard.
+        val englishNow = Prefs.speechLang(this).ifBlank { java.util.Locale.getDefault().language }.startsWith("en", ignoreCase = true)
+        val piece = if (Prefs.typerPunct(this) && englishNow) {
             val multi = try { typerNode()?.isMultiLine == true } catch (e: Exception) { false }
             Typer.punctuate(piece0, multi)
         } else piece0

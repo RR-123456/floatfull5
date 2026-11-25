@@ -194,6 +194,7 @@ object Offline {
             .put("speech", OfflineSpeech.state)
             .put("voice", if (Speaker.get(c).hasOfflineVoice()) "ok" else "missing")
             .put("piper", PiperTts.hasModel(c)).put("piperState", PiperTts.state).put("piperDl", PiperTts.dlState)
+            .put("piperTrace", PiperTts.lastTrace).put("mms", MmsTts.statusJson(c))
             .put("piperDownloading", PiperTts.downloading).put("piperOn", Prefs.piperOn(c)).put("piperLoaded", PiperTts.loaded())
             .put("a11y", PragonAccessibilityService.instance != null)
             .put("packRunning", ModelPack.running).put("packState", ModelPack.state)

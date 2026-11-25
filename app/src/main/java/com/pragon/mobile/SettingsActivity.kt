@@ -559,6 +559,24 @@ class SettingsActivity : AppCompatActivity() {
             }
             js("setTimeout(loadOffline,500)")
         }
+        // ---- v8.2: offline Tamil / Telugu / Hindi voices and the voice test ----
+        @JavascriptInterface fun mmsAction(action: String, code: String) {
+            val c = this@SettingsActivity
+            val l = MmsTts.byCode(code) ?: return
+            when (action) {
+                "download" -> when {
+                    MmsTts.hasModel(c, l) -> toast("The ${l.name} voice is already installed.")
+                    MmsTts.downloading(l) -> toast("Already downloading: ${MmsTts.dlState(l)}")
+                    !Net.online(c) -> toast("Connect to Wi-Fi first: the voice downloads once (about 110 MB).")
+                    else -> { MmsTts.download(c, l); toast("Downloading the ${l.name} voice (about 110 MB). Use Wi-Fi.") }
+                }
+                "load" -> if (MmsTts.hasModel(c, l)) { MmsTts.warmup(c, l); toast("Loading the ${l.name} voice...") } else toast("Download the ${l.name} voice first.")
+                "unload" -> { MmsTts.release(l.code); toast("${l.name} voice unloaded. The phone's own voice speaks.") }
+            }
+            js("setTimeout(loadOffline,800)")
+        }
+        /** Runs every offline voice and the listener once and returns a plain-text report (blocks for a few seconds). */
+        @JavascriptInterface fun diagnoseVoices(): String = try { VoiceDiag.report(this@SettingsActivity) } catch (e: Throwable) { "The test itself crashed: " + VoiceDiag.trace(e) }
         // ---- v7.7: find and download a different model ----
         @JavascriptInterface fun searchModels(q: String) { ModelSearch.search(this@SettingsActivity, q) }
         @JavascriptInterface fun listModelFiles(id: String) { ModelSearch.listFiles(this@SettingsActivity, id) }
@@ -583,6 +601,19 @@ class SettingsActivity : AppCompatActivity() {
                 SherpaStt.downloading -> toast("Already downloading: ${SherpaStt.dlState}")
                 !Net.online(c) -> toast("Connect to Wi-Fi first: the model downloads once.")
                 else -> { SherpaStt.download(c); toast("Downloading the speech model (about 70 MB). Use Wi-Fi.") }
+            }
+            js("loadOffline()")
+        }
+        /** v8.1: other-language offline speech. Saves the link and downloads it over the installed model (blank = back to English). */
+        @JavascriptInterface fun useSpeechModel(url: String) {
+            val c = this@SettingsActivity
+            val u = url.trim()
+            if (u.isNotBlank() && !u.startsWith("https://")) { toast("The link must start with https://"); return }
+            Prefs.setSttModelUrl(c, u)
+            when {
+                SherpaStt.downloading -> toast("Already downloading: ${SherpaStt.dlState}")
+                !Net.online(c) -> toast("Link saved. Connect to Wi-Fi, then tap Use this model again.")
+                else -> { SherpaStt.download(c); toast(if (u.isBlank()) "Downloading the English speech model." else "Downloading your speech model. Use Wi-Fi.") }
             }
             js("loadOffline()")
         }

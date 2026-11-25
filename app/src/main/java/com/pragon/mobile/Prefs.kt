@@ -116,16 +116,11 @@ object Prefs {
     /** What to call the user. The PC protocol says "sir". */
     fun callMe(c: Context): String = (sp(c).getString("call_me", "sir") ?: "sir").trim().ifBlank { "sir" }
     /** BCP-47 tag for listening and (for Latin-script replies) speaking. "" = the phone's language. */
-    /** v7.7 English only: always an English locale (a saved non-English choice from an older version is ignored). */
-    fun speechLang(c: Context): String {
-        val saved = (sp(c).getString("speech_lang", "") ?: "").trim()
-        if (saved.startsWith("en", ignoreCase = true)) return saved
-        val d = java.util.Locale.getDefault()
-        return if (d.language == "en") d.toLanguageTag() else "en-US"
-    }
+    /** v8.1: all languages are back. Whatever was chosen in Settings; "" = the phone's own language. */
+    fun speechLang(c: Context): String = (sp(c).getString("speech_lang", "") ?: "").trim()
     /** "" = reply in whatever language the user is using right now; otherwise lock to this language name, e.g. "Tamil". */
-    /** v7.7 English only: replies are always locked to English. */
-    fun replyLang(c: Context): String = "English"
+    /** v8.1: all languages are back. "" = follow the language the user speaks; otherwise the language name chosen in Settings. */
+    fun replyLang(c: Context): String = (sp(c).getString("reply_lang", "") ?: "").trim()
     fun ttsRate(c: Context): Float = sp(c).getFloat("tts_rate", 1.0f)
     fun ttsPitch(c: Context): Float = sp(c).getFloat("tts_pitch", 0.95f)
     fun ttsVoice(c: Context): String = sp(c).getString("tts_voice", "") ?: ""
@@ -180,7 +175,7 @@ object Prefs {
     fun setSttEngine(c: Context, e: String) = sp(c).edit().putString("stt_engine", e).apply()
     /** Zip of a Vosk model. Default: small English. Change it (a Vosk model URL) for another language. */
     fun sttModelUrl(c: Context): String =
-        SherpaStt.DEFAULT_MODEL_URL   // v7.7 English only: always the English model (an old custom or Vosk link is ignored)
+        (sp(c).getString("stt_model_url", "") ?: "").trim().ifBlank { SherpaStt.DEFAULT_MODEL_URL }   // v8.1: a custom speech model link works again; blank = the English model
 
     /** v12: run the chat model on the phone's GPU (CPU stays free for speech and the router). Off by default; falls back to CPU if the GPU can't start. */
     fun chatGpu(c: Context): Boolean = sp(c).getBoolean("chat_gpu", false)

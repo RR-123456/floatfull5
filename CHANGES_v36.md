@@ -17,6 +17,15 @@ slightly off (it was measured with wide, ragged filters).
 The reference was re-measured with this engine's own analysis from both "assistant voice" clips (smoothed 0.4 octave so it does not copy
 the words of the clip): median pitch 137.3 Hz and 21 band levels (`REF_BAND_DB`).
 
+## Manual controls (Settings > Pragon Live voice > Voice tuner)
+Everything can now be tuned by ear. The automatic match still runs, and your settings are added on top:
+- **Equaliser: 21 sliders**, 83 Hz to 11 kHz, +/-12 dB each, with the automatic gain shown beside each one ("auto +2.5"). **Flatten equaliser** zeroes them.
+- **Automatic tone match** on/off (off = only your equaliser shapes the tone) and **Tone match** strength.
+- **Target pitch** in Hz (default = the reference, 137.3), **Pitch fine-tune** (+/-6 st), **Match the pitch by itself** on/off.
+- **Keep voice size** (0 to 100%) and **Voice size** (+/-6 st).
+- Warmth, presence, metallic, space, loudness. The status line shows the heard pitch, the target, and the shift being applied.
+- Live: every slider applies to the next piece of speech. Pitch memory is now about 16 s of speech, so the automatic pitch is steadier.
+
 ## Fixes that came with it
 - The last words of a sentence are no longer held back: after a short pause the player pushes the tuner's delay out (`Chain.flush`).
 - If you interrupt Pragon, whatever is still inside the tuner is thrown away (`Chain.interrupt`), so no stale half-sentence is played later.

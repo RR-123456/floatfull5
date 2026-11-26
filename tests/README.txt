@@ -13,3 +13,4 @@ V14 tests (Typer auto punctuation, v7.7): kotlinc tests/Stubs.kt app/src/main/ja
 v36 voice tuner (Java, javac only, no Android): from the repo root, with the reference clips as 24 kHz mono WAVs in /home/claude/ref (see CHANGES_v36.md):
   java -m jdk.compiler/com.sun.tools.javac.Main -d out app/src/main/java/com/pragon/mobile/VoiceMorph.java tests/WavIO.java tests/VoiceMorphTest.java tests/MorphRobustTest.java tests/RefTool.java
   java -cp out VoiceMorphTest ; java -cp out MorphRobustTest ; java -cp out RefTool   (RefTool prints REF_BAND_DB and REF_F0 for VoiceMorph.java)
+  MorphParamTest checks that every manual parameter moves the sound the way it is labelled.

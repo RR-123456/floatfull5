@@ -44,6 +44,14 @@ public final class VoiceMorph {
         public float gainDb = 0f;
         /** 0 = this engine shifts the pitch (default). 1 = the phone's player does (AudioTrack playback pitch). */
         public int pitchMode = 0;
+        /** Pitch the automatic match aims for, Hz. 0 = the reference voice's pitch. */
+        public float targetF0 = 0f;
+        /** 0..1: how much of the pitch move's effect on the voice size is undone (0 = size follows pitch, 1 = size stays put). */
+        public float formantKeep = 0.65f;
+        /** Automatic tone match on/off. Off = only the manual equaliser below shapes the tone. */
+        public boolean autoTone = true;
+        /** Manual 21-band equaliser, dB per band (-12..12), added on top of the automatic tone match. */
+        public final float[] eq = new float[NB];
     }
 
     // ------------------------------------------------------------------ reference (measured with this code)
@@ -59,7 +67,7 @@ public final class VoiceMorph {
     static final int N = 1024, HOP = 256, HALF = N / 2;
     private static final float GATE_RMS = 0.01f;
     private static final float F0_RMS = 0.03f;
-    private static final int F0_FRAME = 960, F0_HOP = 480, F0_MIN_LAG = 80, F0_MAX_LAG = 342, F0_KEEP = 300;
+    private static final int F0_FRAME = 960, F0_HOP = 480, F0_MIN_LAG = 80, F0_MAX_LAG = 342, F0_KEEP = 800;
     private static final float MAX_EQ_DB = 9f;
     private static final float MAX_AUTO_SEMI = 6f;
     private static final float TAU_SEC = 12f;
@@ -313,7 +321,8 @@ public final class VoiceMorph {
         float med = median();
         float want = 0f;
         if (p.pitchAuto && med > 0f) {
-            want = (float) (12.0 * Math.log(REF_F0 / med) / Math.log(2.0));
+            float tgt = p.targetF0 > 40f ? p.targetF0 : REF_F0;
+            want = (float) (12.0 * Math.log(tgt / med) / Math.log(2.0));
             want = Math.max(-MAX_AUTO_SEMI, Math.min(MAX_AUTO_SEMI, want));
         } else if (p.pitchAuto) want = autoSemi;      // not enough heard yet: hold
         float step = 2.0f * secs;                      // semitones per second the shift may move
@@ -465,7 +474,8 @@ public final class VoiceMorph {
     /** How the formants have to move from where the pitch shifter leaves them (>1 = up). */
     private double formantRatio(Params p) {
         double rho = Math.max(0.6, Math.min(1.6, rhoNow));
-        double c = Math.pow(rho, -FORMANT_KEEP) * Math.pow(2.0, p.formant / 12.0);
+        double keep = Math.max(0f, Math.min(1f, p.formantKeep));
+        double c = Math.pow(rho, -keep) * Math.pow(2.0, p.formant / 12.0);
         // The shifter moved every formant by rho; we want them at rho^(1-FORMANT_KEEP) (times the user's offset).
         // In pitchMode 1 the player does the moving later and the same correction applies.
         return Math.max(0.6, Math.min(1.7, c));
@@ -487,23 +497,25 @@ public final class VoiceMorph {
                 float a = want[Math.max(0, b - 1)], c = want[Math.min(NB - 1, b + 1)];
                 sm[b] = 0.25f * a + 0.5f * want[b] + 0.25f * c - mean;
             }
-            float mt = Math.max(0f, Math.min(1f, p.match)) * trust;
+            float mt = p.autoTone ? Math.max(0f, Math.min(1f, p.match)) * trust : 0f;
             for (int b = 0; b < NB; b++) {
                 float g = Math.max(-MAX_EQ_DB, Math.min(MAX_EQ_DB, sm[b] * mt));
                 eqDb[b] += Math.max(-0.15f, Math.min(0.15f, g - eqDb[b]));
             }
         } else for (int b = 0; b < NB; b++) eqDb[b] = 0f;
         float wm = Math.max(-9f, Math.min(9f, p.warmth)), pr = Math.max(-9f, Math.min(9f, p.presence));
+        float[] tot = new float[NB];
+        for (int b = 0; b < NB; b++) tot[b] = eqDb[b] + Math.max(-12f, Math.min(12f, p.eq[b]));
         for (int k = 0; k <= HALF; k++) {
             double lf = binLogF[k];
             float db;
-            if (lf <= Math.log(centers[0])) db = eqDb[0];
-            else if (lf >= Math.log(centers[NB - 1])) db = eqDb[NB - 1];
+            if (lf <= Math.log(centers[0])) db = tot[0];
+            else if (lf >= Math.log(centers[NB - 1])) db = tot[NB - 1];
             else {
-                db = eqDb[NB - 1];
+                db = tot[NB - 1];
                 for (int b = 0; b < NB - 1; b++) {
                     double a = Math.log(centers[b]), c = Math.log(centers[b + 1]);
-                    if (lf >= a && lf <= c) { float t = (float) ((lf - a) / (c - a)); db = eqDb[b] * (1 - t) + eqDb[b + 1] * t; break; }
+                    if (lf >= a && lf <= c) { float t = (float) ((lf - a) / (c - a)); db = tot[b] * (1 - t) + tot[b + 1] * t; break; }
                 }
             }
             double f = (double) k * SR / N;
@@ -524,7 +536,12 @@ public final class VoiceMorph {
         return REF_BAND_DB[NB - 1];
     }
 
+    /** Current automatic equaliser gains, dB per band (for the screen). */
     public float[] eqGains() { return eqDb.clone(); }
+    /** Pitch shift being applied right now, semitones. */
+    public float appliedSemitones() { return (float) (12.0 * Math.log(rhoNow) / Math.log(2.0)); }
+    /** Centre frequency of each equaliser band, Hz. */
+    public static float[] bandCenters() { float[] c = new float[NB]; for (int b = 0; b < NB; b++) c[b] = (float) Math.sqrt((double) EDGES[b] * EDGES[b + 1]); return c; }
 
     private static float limit(float v) {
         float a = Math.abs(v), th = 0.7f;

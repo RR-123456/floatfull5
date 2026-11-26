@@ -17,6 +17,8 @@ object VoiceTuner {
         private set
     @Volatile private var heardF0 = 0f
     @Volatile private var heardSecs = 0f
+    @Volatile private var appliedSemi = 0f
+    @Volatile private var autoEq = FloatArray(VoiceMorph.NB)
 
     private fun load(c: Context): JSONObject = try { JSONObject(Prefs.tuner(c)) } catch (e: Exception) { JSONObject() }
 
@@ -35,6 +37,10 @@ object VoiceTuner {
             space = f("space", 0.0).coerceIn(0f, 1f)
             gainDb = f("gainDb", 0.0).coerceIn(-6f, 6f)
             pitchMode = if (j.optInt("pitchMode", 0) == 1) 1 else 0
+            targetF0 = f("targetF0", VoiceMorph.REF_F0.toDouble()).coerceIn(70f, 220f)
+            formantKeep = f("formantKeep", 0.65).coerceIn(0f, 1f)
+            autoTone = j.optBoolean("autoTone", true)
+            for (b in 0 until VoiceMorph.NB) eq[b] = f("eq$b", 0.0).coerceIn(-12f, 12f)
         }
     }
 
@@ -46,18 +52,21 @@ object VoiceTuner {
             .put("formant", p.formant.toDouble())
             .put("warmth", p.warmth.toDouble()).put("presence", p.presence.toDouble()).put("metallic", p.metallic.toDouble())
             .put("space", p.space.toDouble()).put("gainDb", p.gainDb.toDouble()).put("pitchMode", p.pitchMode)
+            .put("targetF0", p.targetF0.toDouble()).put("formantKeep", p.formantKeep.toDouble()).put("autoTone", p.autoTone)
+            .put("eq", org.json.JSONArray(p.eq.map { it.toDouble() })).put("autoEq", org.json.JSONArray(autoEq.map { it.toDouble() }))
+            .put("bands", org.json.JSONArray(VoiceMorph.bandCenters().map { it.toDouble() })).put("appliedSemi", appliedSemi.toDouble())
             .put("refF0", VoiceMorph.REF_F0.toDouble()).put("heardF0", heardF0.toDouble()).put("heardSecs", heardSecs.toDouble())
             .toString()
     }
 
-    /** key: on, match, pitchAuto, pitchSemi, formant, warmth, presence, metallic, space, gainDb, pitchMode. Booleans arrive as 0 or 1. */
+    /** key: on, match, pitchAuto, autoTone, pitchSemi, targetF0, formant, formantKeep, warmth, presence, metallic, space, gainDb, pitchMode, eq0..eq20. Booleans arrive as 0 or 1. */
     fun set(c: Context, key: String, v: Double) {
         val j = load(c)
         when (key) {
-            "on", "pitchAuto" -> j.put(key, v >= 0.5)
+            "on", "pitchAuto", "autoTone" -> j.put(key, v >= 0.5)
             "pitchMode" -> j.put(key, if (v >= 0.5) 1 else 0)
-            "match", "pitchSemi", "formant", "warmth", "presence", "metallic", "space", "gainDb" -> j.put(key, v)
-            else -> return
+            "match", "pitchSemi", "formant", "warmth", "presence", "metallic", "space", "gainDb", "targetF0", "formantKeep" -> j.put(key, v)
+            else -> if (Regex("eq\\d+").matches(key)) j.put(key, v) else return
         }
         Prefs.setTuner(c, j.toString()); version++
     }
@@ -90,7 +99,7 @@ object VoiceTuner {
             refresh()
             if (!p.on) return pcm
             val out = core.process(pcm, p)
-            heardF0 = core.heardF0(); heardSecs = core.heardSeconds()
+            heardF0 = core.heardF0(); heardSecs = core.heardSeconds(); appliedSemi = core.appliedSemitones(); autoEq = core.eqGains()
             val now = System.currentTimeMillis()
             if (now - saveAt > 10_000) { saveAt = now; save() }
             return out

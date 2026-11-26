@@ -25,7 +25,7 @@ class CustomiserActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        web = OrbWeb.create(this, bubble = false, fileChooser = { cb, intent ->
+        web = OrbWeb.create(this, bubble = false, tuner = true, fileChooser = { cb, intent ->
             pending?.onReceiveValue(null)          // a picker the page never finished: release it
             pending = cb
             try { picker.launch(intent); true } catch (e: Exception) { pending = null; cb.onReceiveValue(null); false }

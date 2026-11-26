@@ -9,6 +9,8 @@ import android.os.Build
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
+import android.media.PlaybackParams
+import kotlin.math.abs
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
@@ -142,7 +144,7 @@ class LiveSession(private val app: Context, private val ui: Listener) {
         this.greeting = greeting
         wantRunning = true
         try {
-            player = Player(AudioRoute.apply(app)); AudioRoute.onChange = { reroute() }
+            player = Player(AudioRoute.apply(app), VoiceTuner.Chain(app)); AudioRoute.onChange = { reroute() }
         } catch (e: Exception) {
             wantRunning = false
             ui.onError("I couldn't open the audio output: " + (e.message ?: e.javaClass.simpleName)); return
@@ -586,11 +588,12 @@ class LiveSession(private val app: Context, private val ui: Listener) {
     // ───────────────────────────── playback ─────────────────────────────
 
     /** Plays Gemini's 24 kHz PCM from a queue on its own thread, so the socket thread never blocks on audio. */
-    private class Player(private val speaker: AudioDeviceInfo?) {
+    private class Player(private val speaker: AudioDeviceInfo?, private val tuner: VoiceTuner.Chain? = null) {
         private val q = LinkedBlockingQueue<ByteArray>()
         @Volatile private var alive = true
         @Volatile private var writing = false
         @Volatile private var lastEnd = 0L
+        @Volatile private var lastPitch = 1f
         private val track: AudioTrack
         private val thread: Thread
 
@@ -617,13 +620,22 @@ class LiveSession(private val app: Context, private val ui: Listener) {
             track.play()
             thread = Thread {
                 while (alive) {
-                    val b = next() ?: continue
+                    val raw = next() ?: continue
+                    // v35 voice tuner: tone match on the audio, pitch match on the player (never lets a tuner fault silence the voice)
+                    val b = try { tuner?.process(raw) ?: raw } catch (e: Throwable) { raw }
+                    try { tuner?.let { setPitch(it.pitchRatio()) } } catch (e: Throwable) { }
                     writing = true
                     try { track.write(b, 0, b.size) } catch (e: Exception) { }
                     writing = false
                     lastEnd = System.currentTimeMillis()
                 }
             }.apply { isDaemon = true; name = "pragon-live-out"; start() }
+        }
+
+        /** Raise or lower the pitch without changing the speed (some phones ignore this on a voice-call stream; then only the tone match applies). */
+        private fun setPitch(r: Float) {
+            if (abs(r - lastPitch) < 0.004f) return
+            try { track.playbackParams = PlaybackParams().setSpeed(1f).setPitch(r); lastPitch = r } catch (e: Exception) { lastPitch = r }
         }
 
         private fun next(): ByteArray? = try { q.poll(100, TimeUnit.MILLISECONDS) } catch (e: InterruptedException) { null }
@@ -645,6 +657,7 @@ class LiveSession(private val app: Context, private val ui: Listener) {
 
         fun release() {
             alive = false
+            try { tuner?.close() } catch (e: Throwable) { }
             q.clear()
             try { thread.interrupt() } catch (e: Exception) { }
             try { track.pause(); track.flush() } catch (e: Exception) { }

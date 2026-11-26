@@ -118,6 +118,10 @@ class SettingsActivity : AppCompatActivity() {
         @JavascriptInterface fun openOptimiser() {
             runOnUiThread { safeStart(android.content.Intent(this@SettingsActivity, OptimiserActivity::class.java)) }
         }
+        // v35 voice tuner (Settings > Pragon Live voice)
+        @JavascriptInterface fun getTuner(): String = VoiceTuner.json(this@SettingsActivity)
+        @JavascriptInterface fun setTuner(key: String, v: Double) { VoiceTuner.set(this@SettingsActivity, key, v) }
+        @JavascriptInterface fun resetTuner() { VoiceTuner.reset(this@SettingsActivity) }
         @JavascriptInterface fun getOrbScale(): Int = Prefs.orbScale(this@SettingsActivity)
         @JavascriptInterface fun setOrbScale(pct: Int) {
             Prefs.saveOrbScale(this@SettingsActivity, pct)

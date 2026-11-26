@@ -89,7 +89,7 @@ object OrbWeb {
      */
     @SuppressLint("SetJavaScriptEnabled")
     fun create(
-        ctx: Context, bubble: Boolean, menu: Boolean = false, bridge: Any? = null,
+        ctx: Context, bubble: Boolean, menu: Boolean = false, bridge: Any? = null, tuner: Boolean = false,
         fileChooser: ((ValueCallback<Array<Uri>>, android.content.Intent) -> Boolean)? = null,
         onLoaded: (WebView) -> Unit = {}
     ): WebView {
@@ -108,6 +108,7 @@ object OrbWeb {
         w.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         w.setBackgroundColor(if (bubble || menu) Color.TRANSPARENT else Color.BLACK)
         if (bridge != null) w.addJavascriptInterface(bridge, "PragonMenu")
+        if (tuner) w.addJavascriptInterface(VoiceTuner.Bridge(ctx.applicationContext), "PragonTuner")   // v35: the "Charon voice" slider in the UI customiser
         // camera/microphone requests are not granted: the orb stays a plain orb
         w.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(view: WebView?, cb: ValueCallback<Array<Uri>>?, params: FileChooserParams?): Boolean {

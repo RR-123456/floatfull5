@@ -149,6 +149,11 @@ object Prefs {
     /** The PC speaks in Charon. */
     fun liveVoice(c: Context): String = (sp(c).getString("live_voice", "") ?: "").trim().ifBlank { "Charon" }
     fun setLiveVoice(c: Context, v: String) = sp(c).edit().putString("live_voice", v).apply()
+    /** v35 voice tuner: its settings (JSON) and what it has learned about the voice (so the next chat starts already tuned). */
+    fun tuner(c: Context): String = sp(c).getString("tuner", "") ?: ""
+    fun setTuner(c: Context, s: String) = sp(c).edit().putString("tuner", s).apply()
+    fun tunerState(c: Context): String = sp(c).getString("tuner_state", "") ?: ""
+    fun setTunerState(c: Context, s: String) = sp(c).edit().putString("tuner_state", s).apply()
     /** Keep the microphone open while Pragon talks, so you can interrupt it. Turn off if it hears itself (no headphones). */
     fun liveBargeIn(c: Context): Boolean = sp(c).getBoolean("live_barge_in", true)
     fun setLiveBargeIn(c: Context, on: Boolean) = sp(c).edit().putBoolean("live_barge_in", on).apply()

@@ -180,7 +180,7 @@ object ModelPack {
                     val r = Tasks.await(ModuleInstall.getClient(app).areModulesAvailable(seg), 30, TimeUnit.SECONDS)
                     if (r.areModulesAvailable()) "installed" else "missing"
                 } finally { seg.close() }
-            } catch (e: Throwable) { "unknown" }
+            } catch (e: Throwable) { "unavailable" }   // v34: was "unknown" (the badge then stayed "?" forever)
         }.start()
     }
 

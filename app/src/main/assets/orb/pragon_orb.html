@@ -420,6 +420,7 @@ body.ui-closed #emblem .t{scale:1;transition:opacity .5s 1.4s,translate .7s 1.4s
   loadCoreLogo('core-logo.png');
   const S = { state: 'idle', label: 'JARVIS', transparent: false, energy: 0.05, level: 0, extLevel: null, extAt: 0, t: 0,
               menu: { target: 0, k: 0, sel: -1, hover: -1, g: null }, seq: null, spin: null, dock: 0, dockV: 0, clusA: 0, catchDeg: -50.6, ox: 0, oy: 0, sc: 1, zoom: 1, moveAnim: null, labelOn: (function () { try { return localStorage.getItem('orbLabelOn') === '1'; } catch (e) { return false; } })(), lf: { font: '"Montserrat"', w: 500, sz: 1, ls: 0.2, up: true, lam: true, it: false }, lw: 1, lwo: 0.9, dk: 1, dks: 1, sparkle: false, off: { arcs: 1 }, rings: [], clus: [], vg: 0, musicGlow: false, pm: {}, cp: '', sel: null, pickMode: false, orbit: false, glow: 1.1, tr: 1, tg: 0, tk: {}, hue: 0, sat: 101, q: 'high', cm: {}, hr: 1, hs: 1, mir: false };
+  S.emb = { follow: true, pct: 100, ref: 46.835 };   /* v34: page default = follows the orb (customiser); the floating bubble sets it from Settings */
   const TARGET = { idle: 0.0, listening: 0.5, speaking: 1.0 };
   /* every ctx.lineWidth write is multiplied by S.lw (the thickness slider) */
   try {
@@ -2530,7 +2531,8 @@ body.ui-closed #emblem .t{scale:1;transition:opacity .5s 1.4s,translate .7s 1.4s
     if (CORE_LOGO && !S.off.core) {
       const iw = CORE_LOGO.naturalWidth || CORE_LOGO.width, ih = CORE_LOGO.naturalHeight || CORE_LOGO.height;
       if (iw > 0 && ih > 0) {
-        const k = (Rr * 1.86) / Math.hypot(iw, ih), w = iw * k, h = ih * k;   // v20: biggest size that still fits inside the disc
+        const ef = S.emb.follow ? 1 : Math.min(1, S.emb.ref / baseR);   // v34: fixed mode keeps the emblem at its size for the 145% orb (never bigger than the disc)
+        const k = (Rr * 1.86 * ef * S.emb.pct / 100) / Math.hypot(iw, ih), w = iw * k, h = ih * k;   // v20: biggest size that still fits inside the disc
         ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, Rr * 0.97, 0, TAU); ctx.clip();
         ctx.drawImage(CORE_LOGO, cx - w / 2, cy - h / 2, w, h);
         ctx.restore();
@@ -2755,6 +2757,7 @@ body.ui-closed #emblem .t{scale:1;transition:opacity .5s 1.4s,translate .7s 1.4s
     setLabel(t) { S.label = String(t); },
     setLabelOn(on) { S.labelOn = !!on; try { localStorage.setItem('orbLabelOn', S.labelOn ? '1' : '0'); } catch (e) {} },
     getLabelOn() { return !!S.labelOn; },
+    setEmblem(follow, pct, ref) { S.emb.follow = !!follow; S.emb.pct = Math.max(30, Math.min(100, +pct || 100)); if (+ref > 0) S.emb.ref = +ref; },   /* v34: emblem size. follow = scales with the orb; pct = 30..100; ref = orb radius (css px) the fixed size is taken from */
     hasCoreLogo() { return !!CORE_LOGO; },   /* while a core logo is loaded the model name text stays off */
     /* setLabelStyle({font, w, sz, ls, up, lam, it}): CSS font family, weight, size x, letter spacing (em), UPPERCASE, A -> Λ, italic. Works for every orb. */
     setLabelStyle(o) { const L = S.lf; if (o.font !== undefined) L.font = String(o.font); if (o.w !== undefined) L.w = +o.w || 500; if (o.sz !== undefined) L.sz = Math.max(0.3, Math.min(3, +o.sz)); if (o.ls !== undefined) L.ls = Math.max(0, Math.min(1.5, +o.ls)); if (o.up !== undefined) L.up = !!o.up; if (o.lam !== undefined) L.lam = !!o.lam; if (o.it !== undefined) L.it = !!o.it; },

@@ -70,6 +70,37 @@ object OfflineSpeech {
         } catch (e: Exception) { }
     }
 
+    /**
+     * v34: fills in [state] for the Settings badge without waiting for float mode to start (it used to stay "?" until then).
+     * Only looks; it never starts a download.
+     */
+    fun refresh(ctx: Context) {
+        if (state != "unknown") return
+        val app = ctx.applicationContext
+        try {
+            if (Build.VERSION.SDK_INT < 33) {
+                state = if (SpeechRecognizer.isOnDeviceRecognitionAvailable(app) || SpeechRecognizer.isRecognitionAvailable(app)) "ready" else "unsupported"
+                return
+            }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                try {
+                    val rec = create(app, true)
+                    val i = intent(app, true)
+                    val want = language(app).substringBefore('-').lowercase()
+                    rec.checkRecognitionSupport(i, exec, object : RecognitionSupportCallback {
+                        override fun onSupportResult(s: RecognitionSupport) {
+                            val have = s.installedOnDeviceLanguages.any { it.lowercase().startsWith(want) }
+                            val canGet = s.supportedOnDeviceLanguages.any { it.lowercase().startsWith(want) } || s.pendingOnDeviceLanguages.any { it.lowercase().startsWith(want) }
+                            state = if (have) "ready" else if (canGet) "missing" else "unsupported"
+                            android.os.Handler(android.os.Looper.getMainLooper()).post { try { rec.destroy() } catch (e: Exception) { } }
+                        }
+                        override fun onError(error: Int) { state = "unsupported"; android.os.Handler(android.os.Looper.getMainLooper()).post { try { rec.destroy() } catch (e: Exception) { } } }
+                    })
+                } catch (e: Exception) { state = "unsupported" }
+            }
+        } catch (e: Exception) { state = "unsupported" }
+    }
+
     fun describe(error: Int): String = when (error) {
         SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_NETWORK -> "The speech service wanted the internet"
         SpeechRecognizer.ERROR_AUDIO -> "Microphone problem"

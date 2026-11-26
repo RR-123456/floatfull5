@@ -67,6 +67,7 @@ class FloatService : Service() {
 
         /** v7.2: Settings changed the orb size; resize the live bubble without restarting float mode. */
         fun applyOrbSize() { instance?.let { s -> s.main.post { s.resizeBubble() } } }
+        fun applyEmblem() { instance?.let { s -> s.main.post { s.pushEmblem() } } }
 
         /** The in-app mic (Google dialog) needs the microphone: let it have it for a moment. */
         fun pauseForExternalMic(pause: Boolean) {
@@ -346,7 +347,7 @@ class FloatService : Service() {
 
     private fun addBubble() {
         val size = orbPx()   // v20 (v7.2: scaled by the Settings slider): larger window so the orb, glow, ring ticks and startup emblem are never cut at the edges
-        val web = OrbWeb.create(this, bubble = true) { syncOrb(force = true) }
+        val web = OrbWeb.create(this, bubble = true) { syncOrb(force = true); pushEmblem() }
         web.isEnabled = false
         orbWeb = web
         // The FrameLayout takes every touch itself (tap / drag / long-press below); the WebView only draws the orb.
@@ -409,6 +410,12 @@ class FloatService : Service() {
     }
 
     private fun refreshBubble() { syncOrb() }
+
+    /** v34: tells the orb page how big the emblem should be (fixed at its 145%-orb size unless 'follows orb size' is on). 46.835 = the orb radius in CSS px at 145% (190 x 1.45 x 0.17). */
+    private fun pushEmblem() {
+        val w = orbWeb ?: return
+        OrbWeb.call(w, "orb.setEmblem(${Prefs.emblemFollow(this)},${Prefs.emblemScale(this)},46.835)")
+    }
 
     /** Bubble window size in px: the 190dp default times the Settings > orb size percentage. */
     private fun orbPx(): Int = dp(190) * Prefs.orbScale(this) / 100

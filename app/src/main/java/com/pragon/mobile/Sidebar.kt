@@ -952,6 +952,30 @@ class SidebarService : Service() {
     private fun orbBlk(b: LinearLayout) {
         b.addView(label("ORB AND UI CUSTOMISER"))
         b.addView(row(button("Open UI customiser") { openAct(Intent(this, CustomiserActivity::class.java)) }))
+        // v34: orb size, emblem size and 'emblem follows orb size' (same settings as Settings > Floating orb size)
+        b.addView(rangeRow("Orb size", 50, 200, Prefs.orbScale(this)) { Prefs.saveOrbScale(this, it); FloatService.applyOrbSize() })
+        b.addView(rangeRow("Emblem size", 30, 100, Prefs.emblemScale(this)) { Prefs.saveEmblemScale(this, it); FloatService.applyEmblem() })
+        b.addView(row(swBtn("Emblem follows orb size", Prefs.emblemFollow(this)) { Prefs.saveEmblemFollow(this, it); FloatService.applyEmblem() }))
+        b.addView(note("Emblem size stays fixed when you resize the orb, unless 'Emblem follows orb size' is on."))
+    }
+    /** v34: labelled percent slider (min..max) for the sidebar; onSet runs when the finger lifts. */
+    private fun rangeRow(name: String, min: Int, max: Int, start: Int, onSet: (Int) -> Unit): View {
+        val l = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; background = card(14); setPadding(dp(12), dp(8), dp(12), dp(8)) }
+        l.addView(TextView(this).apply { text = name; textSize = 12f; setTextColor(txt); typeface = fSemi }, LinearLayout.LayoutParams(dp(92), ViewGroup.LayoutParams.WRAP_CONTENT))
+        val v = TextView(this).apply { text = "$start%"; textSize = 11.5f; setTextColor(mute); typeface = fReg; gravity = Gravity.END }
+        val sb = android.widget.SeekBar(this).apply {
+            this.max = (max - min) / 5; progress = ((start.coerceIn(min, max) - min) / 5)
+            progressTintList = android.content.res.ColorStateList.valueOf(cyan)
+            thumbTintList = android.content.res.ColorStateList.valueOf(cyan)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: android.widget.SeekBar?, p: Int, fromUser: Boolean) { v.text = "${min + p * 5}%"; if (fromUser) resetIdle() }
+                override fun onStartTrackingTouch(s: android.widget.SeekBar?) { resetIdle() }
+                override fun onStopTrackingTouch(s: android.widget.SeekBar?) { onSet(min + (s?.progress ?: 0) * 5) }
+            })
+        }
+        l.addView(sb, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(dp(4), 0, dp(4), 0) })
+        l.addView(v, LinearLayout.LayoutParams(dp(44), ViewGroup.LayoutParams.WRAP_CONTENT))
+        return l
     }
     private fun paBlk(b: LinearLayout) {
         b.addView(label("PRAGON PA"))

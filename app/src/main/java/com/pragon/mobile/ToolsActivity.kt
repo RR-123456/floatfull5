@@ -346,6 +346,11 @@ open class ToolsActivity : AppCompatActivity() {
             return IrRemote.transmit(this@ToolsActivity, IrCodes.pattern(profile, code)) ?: ""
         }
 
+        /** v34: opens the Neural chat screen. */
+        @JavascriptInterface fun openNeural() = runOnUiThread {
+            go(Intent(this@ToolsActivity, NeuralActivity::class.java), "Could not open Neural.")
+        }
+
         /** Opens the Music screen. */
         @JavascriptInterface fun openMusic() = runOnUiThread {
             go(Intent(this@ToolsActivity, MusicActivity::class.java), "Could not open Music.")

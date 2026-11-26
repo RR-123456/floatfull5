@@ -15,7 +15,7 @@ object Router {
 
     /** Step 1. [raw] is what was heard, [c] the cleaned command (VoiceParser.cleanCommand). Pure phrase matching. */
     fun rules(raw: String, c: String): VoiceParser.Action? =
-        QuickVoice.parse(raw) ?: VisionVoice.parse(raw) ?: V11Voice.parse(raw) ?: V10Voice.parse(raw) ?: V9Voice.parse(raw) ?: VoiceParser.ollamaCommand(raw)
+        QuickVoice.parse(raw) ?: VisionVoice.parse(raw) ?: VoiceSettings.parse(raw) ?: V11Voice.parse(raw) ?: V10Voice.parse(raw) ?: V9Voice.parse(raw) ?: VoiceParser.ollamaCommand(raw)
             ?: VoiceParser.rawAction(VoiceParser.norm(raw)) ?: VoiceParser.actionFor(c)
 
     /** Step 2. Blocking: runs the on-device model (a second or two on first use). null = no usable answer. */

@@ -130,6 +130,12 @@
 
         <!-- v18: video editor -->
         <activity
+            android:name=".NeuralActivity"
+            android:exported="false"
+            android:label="Neural"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".VideoEditorActivity"
             android:exported="false"
             android:launchMode="singleTop"

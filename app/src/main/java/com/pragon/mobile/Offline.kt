@@ -178,6 +178,7 @@ object Offline {
 
     fun status(c: Context): JSONObject {
         ModelPack.refreshCutout(c)
+        OfflineSpeech.refresh(c)
         val r = routerFile(c)
         val ch = chatFile(c)
         return JSONObject()

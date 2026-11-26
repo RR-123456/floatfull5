@@ -214,6 +214,18 @@ object Prefs {
     /** v7.2: floating orb size, percent of the default (50..200). */
     fun orbScale(c: Context): Int = sp(c).getInt("orb_scale", 100).coerceIn(50, 200)
     fun saveOrbScale(c: Context, pct: Int) = sp(c).edit().putInt("orb_scale", pct.coerceIn(50, 200)).apply()
+    /** v34: single-value setters used by voice commands (Settings > Voice and language, AI engine). */
+    fun setSpeechLang(c: Context, tag: String) = sp(c).edit().putString("speech_lang", tag.trim()).apply()
+    fun setReplyLang(c: Context, name: String) = sp(c).edit().putString("reply_lang", name.trim()).apply()
+    fun setTtsRate(c: Context, r: Float) = sp(c).edit().putFloat("tts_rate", r.coerceIn(0.5f, 2.0f)).apply()
+    fun setEngineOnly(c: Context, e: String) = sp(c).edit().putString("engine", e).apply()
+    fun setSpeakTyped(c: Context, on: Boolean) = sp(c).edit().putBoolean("speak_typed", on).apply()
+    fun setFloatNeedsWake(c: Context, on: Boolean) = sp(c).edit().putBoolean("float_needs_wake", on).apply()
+    /** v34: emblem in the orb core. Fixed size (the size it has at a 145% orb) unless 'follows orb size' is on; scale 30..100% of that size. */
+    fun emblemFollow(c: Context): Boolean = sp(c).getBoolean("emblem_follow", false)
+    fun saveEmblemFollow(c: Context, on: Boolean) = sp(c).edit().putBoolean("emblem_follow", on).apply()
+    fun emblemScale(c: Context): Int = sp(c).getInt("emblem_scale", 100).coerceIn(30, 100)
+    fun saveEmblemScale(c: Context, pct: Int) = sp(c).edit().putInt("emblem_scale", pct.coerceIn(30, 100)).apply()
     fun saveFloatPos(c: Context, x: Int, y: Int) = sp(c).edit().putInt("float_x", x).putInt("float_y", y).apply()
 
     /** Forget the PC but keep everything else (AI settings, mode, voice, memory, bubble position). */

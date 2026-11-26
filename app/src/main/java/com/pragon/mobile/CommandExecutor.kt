@@ -137,6 +137,8 @@ object CommandExecutor {
                 "music" -> Music.act(ctx, value.ifEmpty { app })
                 "imagine" -> imagine(ctx, value)
                 "pc_toggle", "airpods", "stt", "features", "llm", "info", "note", "fun" -> V11Actions.run(ctx, action, value)
+                "psetting", "pnumber", "ptool", "pac", "pvoice" -> VoiceSettings.run(ctx, action, value)
+                "play_any" -> playAny(ctx, value)
                 else -> runMain(ctx, cmd, action, value, app, fromStandalone)
             }
         } catch (e: Exception) {
@@ -490,6 +492,17 @@ object CommandExecutor {
     }
 
     /** "play despacito on youtube": searches, waits for the results, then taps the first video so it really plays. */
+    /** v34: "play <name>": a song on this phone when the music player is on and has it, otherwise the first YouTube video. */
+    private fun playAny(ctx: Context, q: String): Res {
+        try {
+            if (Music.enabled(ctx) && Music.hasAccess(ctx)) {
+                val r = Music.act(ctx, "play:$q")
+                if (r.ok) return r
+            }
+        } catch (_: Exception) { }
+        return youtubePlay(ctx, q)
+    }
+
     private fun youtubePlay(ctx: Context, q: String): Res {
         val r = youtubeSearch(ctx, q)
         if (!r.ok) return r

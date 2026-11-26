@@ -544,7 +544,7 @@ object VoiceParser {
         Regex("^(?:search youtube|youtube search|search youtube for|youtube) (?:for )?(.+)$").matchEntire(c)?.let { return Action("youtube_search", it.groupValues[1]) }
         Regex("^(?:google|search google for|search for|search|look up) (.+)$").matchEntire(c)?.let { return Action("web_search", it.groupValues[1]) }
         // "play despacito" -> YouTube (the bare "play"/"play music" cases were handled above)
-        Regex("^play (.{2,60})$").matchEntire(c)?.let { return Action("youtube_play", it.groupValues[1], soft = true) }
+        Regex("^play (.{2,60})$").matchEntire(c)?.let { return Action("play_any", it.groupValues[1], soft = true) }   // v34: songs on the phone first, then YouTube
 
         // ---- call / type ----
         Regex("^(?:call|dial|phone) (?:number )?([0-9+*# ]{3,})$").matchEntire(c)?.let { return Action("call", it.groupValues[1].replace(" ", "")) }

@@ -260,6 +260,11 @@ body.arr .gin>section{outline:1px dashed rgba(19,82,179,.3);outline-offset:2px;b
   <div class="hint" style="margin:4px 0 6px">Makes the floating bubble bigger or smaller. It resizes live while float mode is on.</div>
   <input type="range" id="orbsz" min="50" max="200" step="5" value="100" aria-label="Floating orb size" oninput="orbSz(this.value)" onchange="orbSz(this.value,true)">
   <button class="btn sec" onclick="orbSz(100,true,true)">Reset to 100%</button></div>
+  <div style="margin-top:16px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b>Emblem size</b><span id="embpct" style="color:var(--cyan);font-variant-numeric:tabular-nums">100%</span></div>
+  <div class="hint" style="margin:4px 0 6px">The emblem in the middle of the orb. It keeps one size however big the orb is (the size it has at a 145% orb). 100% is that size; lower makes it smaller.</div>
+  <input type="range" id="embsz" min="30" max="100" step="5" value="100" aria-label="Emblem size" oninput="embSz(this.value)" onchange="embSz(this.value,true)">
+  <label class="srow"><span class="t"><b>Emblem size follows orb size</b><span class="sub">Off: the emblem stays the same size when you resize the orb. On: it grows and shrinks with the orb.</span></span><input type="checkbox" class="sw" id="embfol" onchange="N.setEmblemFollow(this.checked)"></label>
+  <button class="btn sec" onclick="embSz(100,true,true)">Reset emblem to 100%</button></div>
 </div></section><section><h2 class="pg-h"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px;vertical-align:-3px;margin-right:8px"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.75" opacity=".45"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg>Float and typer</h2><div class="card">
   <label class="srow"><span class="t"><b>Pragon Live voice</b><span class="sub">Native audio, one continuous conversation you can interrupt. Needs the online engine, an API key and Privacy Shield off (or generativelanguage.googleapis.com under Trusted hosts). If it can't connect, float mode uses the on-phone recognizer.</span></span><input type="checkbox" class="sw" id="f_live" onchange="N.setSwitch('liveOn',this.checked)"></label>
   <label class="srow"><span class="t"><b>Let me interrupt Pragon while it talks</b><span class="sub">Keeps the microphone open while Pragon speaks. Works best with headphones; turn it off if Pragon answers itself on the loudspeaker.</span></span><input type="checkbox" class="sw" id="f_barge" onchange="N.setSwitch('liveBargeIn',this.checked)"></label>
@@ -407,6 +412,7 @@ const N=window.PragonNative||{
   openFiles(){location.href='files.html'},
   openOptimiser(){location.href='optimiser.html'},
   openCustomiser(){alert('(app) opens the UI customiser: the PC orb page with its customiser widget')},
+  getEmblemScale:()=>+(localStorage.getItem('embScale')||100),setEmblemScale(p){try{localStorage.setItem('embScale',p)}catch(e){}},getEmblemFollow:()=>localStorage.getItem('embFol')==='1',setEmblemFollow(b){try{localStorage.setItem('embFol',b?'1':'0')}catch(e){}},
   getOrbScale:()=>+(localStorage.getItem('orbScale')||100),setOrbScale(p){try{localStorage.setItem('orbScale',p)}catch(e){}},
   getState:()=>JSON.stringify({paired:true,host:'192.168.1.2:8000',status:'Connected to Pragon on your PC',a11y:true,overlay:false,battery:true}),
   scanQr(){alert('(app) opens the QR scanner')},connect(h,k){alert('(app) pair with '+h+' key '+k)},
@@ -431,6 +437,8 @@ window.pmRefresh=function(){const s=JSON.parse(N.getState());
   if(s.host&&!host.value)host.value=s.host;
   [['p1',s.a11y],['p2',s.overlay],['p3',s.battery]].forEach(([i,v])=>{const e=document.getElementById(i);e.textContent=v?'ON':'OFF';e.classList.toggle('on',!!v);});};
 let orbT=0;function orbSz(v,commit,sync){v=Math.max(50,Math.min(200,Math.round(+v)||100));document.getElementById('orbpct').textContent=v+'%';if(sync)document.getElementById('orbsz').value=v;clearTimeout(orbT);if(commit){N.setOrbScale(v)}else{orbT=setTimeout(()=>N.setOrbScale(v),120)}}
+let embT=0;function embSz(v,commit,sync){v=Math.max(30,Math.min(100,Math.round(+v)||100));document.getElementById('embpct').textContent=v+'%';if(sync)document.getElementById('embsz').value=v;clearTimeout(embT);if(commit){N.setEmblemScale(v)}else{embT=setTimeout(()=>N.setEmblemScale(v),120)}}
+try{const e=+N.getEmblemScale();document.getElementById('embsz').value=e;document.getElementById('embpct').textContent=e+'%';document.getElementById('embfol').checked=!!N.getEmblemFollow()}catch(e){}
 try{const o=+N.getOrbScale();document.getElementById('orbsz').value=o;document.getElementById('orbpct').textContent=o+'%'}catch(e){}
 let fgArm=0;function fgTap(){const b=document.getElementById('fg');if(fgArm){fgArm=0;b.textContent='Disconnect and forget this PC';N.forget();return;}fgArm=1;b.textContent='Tap again to confirm';setTimeout(()=>{fgArm=0;b.textContent='Disconnect and forget this PC';},3000);}
 let aiInit=false;
@@ -550,18 +558,19 @@ function loadFeatures(){let f;try{f=JSON.parse(N.getFeatures());}catch(e){return
   f.features.forEach(x=>{const row=document.createElement('div');row.className='mrow';if(!x.works)row.style.opacity='.45';
     const sp=document.createElement('span');sp.textContent=x.title+' ';const sm=document.createElement('small');sm.textContent='say: '+x.example+(x.works?'':' (needs '+x.needs+')');sp.appendChild(sm);row.appendChild(sp);ft_list.appendChild(row);});}
 function savePc(){const n=pc_name.value.trim();if(!n)return;N.saveContact(n,pc_num.value.trim());pc_name.value='';pc_num.value='';setTimeout(loadCalls,700);}
-function loadOffline(){let o;try{o=JSON.parse(N.getOffline());}catch(e){return;}
+let offTries=0;function loadOffline(){let o;try{o=JSON.parse(N.getOffline());}catch(e){return;}
+if((o.speech==='unknown'||o.cut==='unknown'||o.cut==='checking')&&offTries++<20)setTimeout(loadOffline,1500);
 off_on.checked=!!o.locked;off_send.checked=o.autoSend;off_par.checked=!!o.parallel;
 ['auto','vosk','android'].forEach(x=>document.getElementById('stt_'+x).classList.toggle('on',x===o.stt));
 if(!off_vurl.value&&o.sttUrlCustom)off_vurl.value=o.sttUrl;if(!stt_link.value&&o.sttUrlCustom)stt_link.value=o.sttUrl;if(!off_url.value)off_url.value=o.url;off_dir.textContent=o.modelDir;
 const pill=(el,ok,t1,t0)=>{el.textContent=ok?t1:t0;el.classList.toggle('on',!!ok);};
 pill(off_model,o.routerReady,'INSTALLED','MISSING');pill(off_chat,o.chatReady,'INSTALLED','MISSING');chat_dl.textContent=o.downloading?(o.dl):(o.dl&&o.dl!=='done'?o.dl:(o.chatReady?('Installed ('+o.chatMb+' MB). State: '+o.chatState):''));pill(off_vosk,o.vosk,'INSTALLED','MISSING');
 off_vosk_dl.textContent=o.voskDownloading?('Downloading: '+o.voskDl):(o.voskDl&&o.voskDl!=='done'?o.voskDl:(o.vosk?('Installed. State: '+o.voskState):''));
-if(o.voskDownloading)setTimeout(loadOffline,1200);pill(off_speech,o.speech==='ready','READY',o.speech==='unknown'?'?':'MISSING');pill(off_voice,o.voice==='ok','READY','MISSING');
+if(o.voskDownloading)setTimeout(loadOffline,1200);pill(off_speech,o.speech==='ready','READY',o.speech==='unknown'?'CHECKING...':(o.speech==='unsupported'?'NOT SUPPORTED':'MISSING'));pill(off_voice,o.voice==='ok','READY','MISSING');
 off_dl.textContent=o.downloading?('Downloading: '+o.dl):(o.dl&&o.dl!=='done'?o.dl:(o.routerReady?('Installed ('+o.routerMb+' MB). State: '+o.routerState):''));
 off_info.textContent=o.device+', '+o.ram+' GB RAM. Chat model: '+(o.chatReady?'installed ('+o.chatState+')':'none (optional: put chat.litertlm in the models folder)')+'.';
 const st=(el,inst,state)=>{el.textContent=!inst?'MISSING':(state==='ready'?'LOADED':(state==='loading'?'LOADING':(String(state).indexOf('error')===0?'ERROR':'INSTALLED')));el.classList.toggle('on',!!inst&&String(state).indexOf('error')!==0);};
-st(pk_speech,o.vosk,o.voskState);st(pk_piper,o.piper,o.piperState);['ta','te','hi'].forEach(l=>{const m=(o.mms||{})[l]||{};st(document.getElementById('pk_mms_'+l),m.has,m.state);});{const E=[];const add=(n,v)=>{if(v&&String(v).indexOf('error')===0)E.push(n+': '+v)};add('Speech pack',o.voskState);add('Speech pack download',o.voskDl);add('Realistic voice',o.piperState);add('Realistic voice download',o.piperDl);add('Command model',o.routerState);add('Chat model',o.chatState);['ta','te','hi'].forEach(l=>{const m=(o.mms||{})[l]||{};add(l.toUpperCase()+' voice',m.state);add(l.toUpperCase()+' voice download',m.dl)});pk_errs.textContent=E.join('\n');}st(pk_cmd,o.routerReady,o.routerState);st(pk_chat,o.chatReady,o.chatState);pill(pk_cut,o.cut==='installed','INSTALLED',o.cut==='downloading'?'DOWNLOADING':(o.cut==='missing'?'MISSING':'?'));
+st(pk_speech,o.vosk,o.voskState);st(pk_piper,o.piper,o.piperState);['ta','te','hi'].forEach(l=>{const m=(o.mms||{})[l]||{};st(document.getElementById('pk_mms_'+l),m.has,m.state);});{const E=[];const add=(n,v)=>{if(v&&String(v).indexOf('error')===0)E.push(n+': '+v)};add('Speech pack',o.voskState);add('Speech pack download',o.voskDl);add('Realistic voice',o.piperState);add('Realistic voice download',o.piperDl);add('Command model',o.routerState);add('Chat model',o.chatState);['ta','te','hi'].forEach(l=>{const m=(o.mms||{})[l]||{};add(l.toUpperCase()+' voice',m.state);add(l.toUpperCase()+' voice download',m.dl)});pk_errs.textContent=E.join('\n');}st(pk_cmd,o.routerReady,o.routerState);st(pk_chat,o.chatReady,o.chatState);pill(pk_cut,o.cut==='installed','INSTALLED',o.cut==='downloading'?'DOWNLOADING':(o.cut==='missing'?'MISSING':(o.cut==='unavailable'?'NOT AVAILABLE':'CHECKING...')));
 pk_btn.disabled=!!o.packRunning;pk_btn.textContent=o.packRunning?'Working...':'Download and load all models';pk_forget.style.display=o.hfSaved?'':'none';pk_tok.placeholder=o.hfSaved?'Token saved on this phone':'Hugging Face token (once, for the Gemma chat model)';pk_state.textContent=o.packState||(o.downloading?('Downloading: '+o.dl):(o.voskDownloading?('Speech pack: '+o.voskDl):''));
 if(o.packRunning)setTimeout(loadOffline,1500);
 if(o.downloading)setTimeout(loadOffline,1500);}

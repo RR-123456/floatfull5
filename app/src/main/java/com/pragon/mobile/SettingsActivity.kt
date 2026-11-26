@@ -123,6 +123,10 @@ class SettingsActivity : AppCompatActivity() {
             Prefs.saveOrbScale(this@SettingsActivity, pct)
             FloatService.applyOrbSize()
         }
+        @JavascriptInterface fun getEmblemFollow(): Boolean = Prefs.emblemFollow(this@SettingsActivity)
+        @JavascriptInterface fun setEmblemFollow(on: Boolean) { Prefs.saveEmblemFollow(this@SettingsActivity, on); FloatService.applyEmblem() }
+        @JavascriptInterface fun getEmblemScale(): Int = Prefs.emblemScale(this@SettingsActivity)
+        @JavascriptInterface fun setEmblemScale(pct: Int) { Prefs.saveEmblemScale(this@SettingsActivity, pct); FloatService.applyEmblem() }
         @JavascriptInterface fun openCustomiser() {
             runOnUiThread { safeStart(android.content.Intent(this@SettingsActivity, CustomiserActivity::class.java)) }
         }

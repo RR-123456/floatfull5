@@ -620,8 +620,21 @@ class LiveSession(private val app: Context, private val ui: Listener) {
             track.play()
             thread = Thread {
                 while (alive) {
-                    val raw = next() ?: continue
-                    // v35 voice tuner: tone match on the audio, pitch match on the player (never lets a tuner fault silence the voice)
+                    val raw = next()
+                    if (raw == null) {
+                        // v36: after a pause, push the last words out of the voice tuner's delay (otherwise a sentence ends early)
+                        if (q.isEmpty() && tuner != null && System.currentTimeMillis() - lastEnd > 150) {
+                            val tail = try { if (tuner.pending()) tuner.flush() else null } catch (e: Throwable) { null }
+                            if (tail != null && tail.isNotEmpty()) {
+                                writing = true
+                                try { track.write(tail, 0, tail.size) } catch (e: Exception) { }
+                                writing = false
+                                lastEnd = System.currentTimeMillis()
+                            }
+                        }
+                        continue
+                    }
+                    // v36 voice tuner: pitch, voice size and tone are changed in the audio itself (a tuner fault never silences the voice)
                     val b = try { tuner?.process(raw) ?: raw } catch (e: Throwable) { raw }
                     try { tuner?.let { setPitch(it.pitchRatio()) } } catch (e: Throwable) { }
                     writing = true
@@ -632,7 +645,7 @@ class LiveSession(private val app: Context, private val ui: Listener) {
             }.apply { isDaemon = true; name = "pragon-live-out"; start() }
         }
 
-        /** Raise or lower the pitch without changing the speed (some phones ignore this on a voice-call stream; then only the tone match applies). */
+        /** Only used when the tuner is set to let the phone's player shift the pitch (pitchMode 1); some phones ignore it on a call stream. */
         private fun setPitch(r: Float) {
             if (abs(r - lastPitch) < 0.004f) return
             try { track.playbackParams = PlaybackParams().setSpeed(1f).setPitch(r); lastPitch = r } catch (e: Exception) { lastPitch = r }
@@ -648,6 +661,7 @@ class LiveSession(private val app: Context, private val ui: Listener) {
         /** Drop everything not yet played (the user interrupted). */
         fun flush() {
             q.clear()
+            try { tuner?.interrupt() } catch (e: Throwable) { }
             try { track.pause(); track.flush(); track.play() } catch (e: Exception) { }
         }
 

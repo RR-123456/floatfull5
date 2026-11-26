@@ -9,3 +9,7 @@ V11 tests: kotlinc tests/Stubs.kt app/src/main/java/com/pragon/mobile/Calc.kt ..
 V12 tests: kotlinc tests/Stubs.kt app/src/main/java/com/pragon/mobile/Calc.kt .../Typer.kt .../VoiceParser.kt .../V9Voice.kt .../V11Voice.kt .../SherpaFiles.kt tests/V12Test.kt -include-runtime -d v12.jar && java -jar v12.jar
 V13 tests: kotlinc tests/Stubs.kt app/src/main/java/com/pragon/mobile/Calc.kt .../Typer.kt .../VoiceParser.kt .../V9Voice.kt .../QuickCatalog.kt .../QuickVoice.kt tests/V13Test.kt -include-runtime -d v13.jar && java -jar v13.jar
 V14 tests (Typer auto punctuation, v7.7): kotlinc tests/Stubs.kt app/src/main/java/com/pragon/mobile/{Calc,Typer,VoiceParser,V9Voice}.kt tests/V14Test.kt -include-runtime -d v14.jar && java -jar v14.jar
+
+v36 voice tuner (Java, javac only, no Android): from the repo root, with the reference clips as 24 kHz mono WAVs in /home/claude/ref (see CHANGES_v36.md):
+  java -m jdk.compiler/com.sun.tools.javac.Main -d out app/src/main/java/com/pragon/mobile/VoiceMorph.java tests/WavIO.java tests/VoiceMorphTest.java tests/MorphRobustTest.java tests/RefTool.java
+  java -cp out VoiceMorphTest ; java -cp out MorphRobustTest ; java -cp out RefTool   (RefTool prints REF_BAND_DB and REF_F0 for VoiceMorph.java)
